@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>勉強RPG：GitHub Wage</title>
+    <title>勉強RPG：ローカル保存</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -56,11 +56,17 @@
 
     <!-- Main Container -->
     <div class="max-w-4xl mx-auto p-4 md:p-8">
-        <h1 class="text-3xl font-bold text-center text-secondary mb-6">📚 勉強RPG ⚔️</h1>
+        <h1 class="text-3xl font-bold text-center text-secondary mb-6">📚 勉強RPG (ローカル保存版) ⚔️</h1>
+        
+        <!-- Info Banner for Local Storage -->
+        <div class="bg-yellow-800 p-3 rounded-lg shadow-lg mb-6 text-sm text-yellow-100">
+            <p class="font-semibold">⚠️ 注意: このデータはブラウザに保存されています。</p>
+            <p class="mt-1">ブラウザのキャッシュをクリアするとデータが消えるためご注意ください。</p>
+        </div>
 
         <!-- User Info Bar -->
         <div id="user-info-bar" class="bg-rpg-card p-3 rounded-lg shadow-lg mb-6 flex justify-between items-center text-sm md:text-base">
-            <p class="font-semibold">ユーザーID: <span id="user-id-display" class="text-primary truncate ml-2">読み込み中...</span></p>
+            <p class="font-semibold">ユーザー: <span id="user-id-display" class="text-primary truncate ml-2">きみ</span></p>
             <p class="font-semibold">ステージ: <span id="stage-display" class="text-secondary ml-2">1</span></p>
             <p class="font-semibold">ガチャ券: <span id="gacha-tickets-display" class="text-yellow-400 ml-2">0</span>枚</p>
         </div>
@@ -81,19 +87,15 @@
     </div>
 
 
-    <!-- Firebase/JS Logic -->
-    <script type="module">
-        // Firebase Imports
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, setDoc, updateDoc, collection, query, orderBy, addDoc, serverTimestamp, getDocs, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    <!-- JS Logic -->
+    <script type="text/javascript">
+        // --------------------------------------------------------------------------------
+        // ** ローカル保存 (localStorage) を使用します **
+        // --------------------------------------------------------------------------------
 
-        // Global Firebase and State Variables
-        // appId をグローバル変数に追加し、setupApp からアクセスできるように修正
-        let app, db, auth, userId = null, appId = 'study-rpg-app'; 
-        let isAuthReady = false;
         let gameState = {};
+        const LOCAL_STORAGE_KEY = 'studyRpgGameState';
+
         const rarityWeights = {
             'L': 1, // Legendary (1%)
             'UR': 4, // Ultra Rare (4%)
@@ -145,7 +147,7 @@
 
         const INITIAL_STATE = {
             gachaTickets: 0,
-            enhancementItems: 0, // 敵撃破で入手する強化アイテム
+            enhancementItems: 0, 
             stage: 1,
             maxHp: 100,
             currentHp: 100,
@@ -163,103 +165,53 @@
             },
             currentMonsters: [], // { name, hp, maxHp }
             lastLoginDate: new Date().toDateString(),
+            studyLogs: [], // [{ timestamp: number, stampType: string }]
         };
 
-        // --- Firebase Setup ---
-        window.onload = async function() {
-            setLogLevel('debug'); // Firestoreログレベル設定
+        // --- Local Storage Management ---
 
-            // appId をグローバル変数に代入するように修正 (const を削除)
-            appId = typeof __app_id !== 'undefined' ? __app_id : 'study-rpg-app'; 
-            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-            const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-            if (Object.keys(firebaseConfig).length === 0) {
-                console.error("Firebase config is missing.");
-                showToast("データベース設定がありません。データ永続化は動作しません。", 'error');
-                // Allow app to run without persistence for testing
-                await setupApp();
-                return;
-            }
-
-            try {
-                app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
+        function loadGameState() {
+            const savedState = localStorage.getItem(LOCAL_STORAGE_KEY);
+            if (savedState) {
+                try {
+                    // 既存の gameState と結合して、新しいプロパティにも対応
+                    const parsedState = JSON.parse(savedState);
+                    gameState = { ...INITIAL_STATE, ...parsedState };
+                } catch (e) {
+                    console.error("Failed to parse game state from localStorage. Using initial state.", e);
+                    gameState = INITIAL_STATE;
                 }
-
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        document.getElementById('user-id-display').textContent = userId.substring(0, 8) + '...';
-                        isAuthReady = true;
-                        setupApp();
-                    } else {
-                        userId = 'anonymous-' + crypto.randomUUID();
-                        document.getElementById('user-id-display').textContent = userId.substring(0, 8) + '...';
-                        isAuthReady = true;
-                        setupApp();
-                        showToast("匿名ユーザーとしてログインしました。", 'info');
-                    }
-                });
-            } catch (error) {
-                console.error("Firebase initialization failed:", error);
-                showToast("初期化エラー: データベースに接続できません。", 'error');
+            } else {
+                gameState = INITIAL_STATE;
             }
+        }
+
+        function saveGameState() {
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(gameState));
+            } catch (e) {
+                console.error("Failed to save game state to localStorage.", e);
+                showToast("データ保存に失敗しました。", 'error');
+            }
+        }
+
+        // --- Core Application Setup ---
+        window.onload = function() {
+            // 1. Load State
+            loadGameState();
+
+            // 2. Initial Setup
+            setupApp();
         };
 
-        // --- Core Application Setup and Listeners ---
         function setupApp() {
-            if (!isAuthReady) return;
-
-            // 1. Setup Firestore Real-time Listeners
-            if (db && userId) {
-                // appId はグローバルスコープからアクセス可能
-                const userDocRef = doc(db, "artifacts", appId, "users", userId, "data", "profile");
-                const studyLogColRef = collection(db, "artifacts", appId, "users", userId, "studyLogs");
-
-                // Snapshot for Game State (Player Data)
-                onSnapshot(userDocRef, (docSnap) => {
-                    if (docSnap.exists()) {
-                        gameState = { ...INITIAL_STATE, ...docSnap.data() };
-                        checkAndResetHP();
-                        calculateStats();
-                        renderUI();
-                    } else {
-                        // Initialize new user state
-                        console.log("Initializing new user profile.");
-                        setDoc(userDocRef, INITIAL_STATE).then(() => {
-                            gameState = INITIAL_STATE;
-                            calculateStats();
-                            renderUI();
-                        }).catch(e => console.error("Error setting initial document:", e));
-                    }
-                }, (error) => {
-                    console.error("Error listening to profile snapshot:", error);
-                });
-
-                // Snapshot for Study Logs (Record Page)
-                onSnapshot(query(studyLogColRef, orderBy('timestamp', 'desc')), (snapshot) => {
-                    gameState.studyLogs = snapshot.docs.map(doc => doc.data());
-                    if (document.getElementById('tab-record-content').style.display !== 'none') {
-                        renderRecordTab();
-                    }
-                }, (error) => {
-                    console.error("Error listening to study logs:", error);
-                });
-            } else {
-                // Non-persistent mode fallback
-                gameState = INITIAL_STATE;
-                calculateStats();
-                renderUI();
-            }
+            // ログイン日をチェックし、HPを回復
+            checkAndResetHP(); 
+            // ステータスを計算
+            calculateStats();
+            // UIをレンダリング
+            renderUI();
             
-            // Initial Tab Render
             showTab('study');
         }
 
@@ -274,26 +226,23 @@
             const equipSlots = ['weapon1', 'weapon2', 'armor', 'pet1', 'pet2', 'pet3'];
 
             equipSlots.forEach(slot => {
-                const itemEntry = gameState.inventory.find(inv => inv.itemId === equipped[slot]);
-                if (itemEntry) {
-                    // itemEntry.type と ITEMS[itemEntry.type] の存在チェックを追加
-                    if (itemEntry.type && ITEMS[itemEntry.type]) { 
-                        const itemData = ITEMS[itemEntry.type].find(i => i.id === itemEntry.id);
-                        if (itemData) {
-                            const plus = itemEntry.plus || 0;
-                            totalAtk += (itemData.atk || 0) + plus;
-                            totalDef += (itemData.def || 0) + plus;
-                            totalMaxHp += (itemData.hp || 0) + (plus * 2); // Pets primarily boost HP, but all items give a minor bonus
-                        } else {
-                            console.warn("Item data not found for:", itemEntry);
-                        }
-                    } else {
-                        console.warn("Invalid item type found in inventory:", itemEntry.type);
+                const itemId = equipped[slot];
+                if (!itemId) return;
+
+                const itemEntry = gameState.inventory.find(inv => inv.itemId === itemId);
+                
+                if (itemEntry && itemEntry.type && ITEMS[itemEntry.type] && Array.isArray(ITEMS[itemEntry.type])) {
+                    const itemData = ITEMS[itemEntry.type].find(i => i.id === itemEntry.id);
+                    if (itemData) {
+                        const plus = itemEntry.plus || 0;
+                        totalAtk += (itemData.atk || 0) + plus;
+                        totalDef += (itemData.def || 0) + plus;
+                        totalMaxHp += (itemData.hp || 0) + (plus * 2);
                     }
                 }
             });
 
-            // Update stats in gameState (not persisted, calculated dynamically)
+            // Update stats in gameState
             gameState.totalAttack = totalAtk;
             gameState.totalDefense = totalDef;
             gameState.totalMaxHp = totalMaxHp;
@@ -303,35 +252,30 @@
             document.getElementById('gacha-tickets-display').textContent = gameState.gachaTickets;
         }
 
-        async function updateGameState(updates) {
-            if (!isAuthReady || !db || !userId) {
-                Object.assign(gameState, updates);
-                calculateStats();
-                renderUI();
-                return;
-            }
-
-            const userDocRef = doc(db, "artifacts", appId, "users", userId, "data", "profile");
-            try {
-                await updateDoc(userDocRef, updates);
-            } catch (error) {
-                console.error("Error updating game state:", error);
-                showToast("データ更新に失敗しました。", 'error');
-            }
+        function updateGameState(updates) {
+            // Local state update
+            Object.assign(gameState, updates);
+            
+            // Re-calculate stats and save state immediately
+            calculateStats();
+            saveGameState();
+            renderUI();
         }
 
         function checkAndResetHP() {
             const today = new Date().toDateString();
             if (gameState.lastLoginDate !== today) {
-                gameState.currentHp = gameState.totalMaxHp || INITIAL_STATE.maxHp;
+                // maxHpを計算してから回復
+                calculateStats();
+                gameState.currentHp = gameState.totalMaxHp;
                 gameState.lastLoginDate = today;
                 updateGameState({ currentHp: gameState.currentHp, lastLoginDate: today });
                 showToast("体力全回復！新しい一日が始まったよ！", 'info');
             } else if (gameState.currentHp > (gameState.totalMaxHp || INITIAL_STATE.maxHp)) {
-                 // Adjust HP down if max HP reduced (e.g. unequip)
+                 // Adjust HP down if max HP reduced
                 gameState.currentHp = gameState.totalMaxHp;
                 updateGameState({ currentHp: gameState.currentHp });
-            } else if (gameState.currentHp === 0 && document.getElementById('tab-combat-content').style.display !== 'none') {
+            } else if (gameState.currentHp <= 0 && document.getElementById('tab-combat-content').style.display !== 'none') {
                 showToast("戦闘不能！明日の回復を待とう。", 'error');
             }
         }
@@ -371,7 +315,8 @@
 
         function renderUI() {
             calculateStats();
-            const currentTab = document.querySelector('.tab-content:not(.hidden)').id.replace('tab-', '').replace('-content', '');
+            const currentTabElement = document.querySelector('.tab-content:not(.hidden)');
+            const currentTab = currentTabElement ? currentTabElement.id.replace('tab-', '').replace('-content', '') : 'study';
             showTab(currentTab); // Re-render current tab
         }
 
@@ -407,10 +352,8 @@
         }
 
         function getItemDetails(itemId, type) {
-            // type が有効なキーであるか、および ITEMS[type] が配列であることを確認
             const itemArray = ITEMS[type];
             if (!itemArray || !Array.isArray(itemArray)) {
-                console.error("Invalid item type:", type);
                 return { name: '不明なアイテム', rarity: 'N', atk: 0, def: 0, hp: 0 };
             }
             const item = itemArray.find(i => i.id === itemId);
@@ -419,23 +362,24 @@
 
         // --- TAB 1: Study & Gacha ---
 
-        window.stampStudy = async function(type) {
+        window.stampStudy = function(type) {
             const typeNames = {
                 'math': '数学', 'code': 'プログラミング', 'lang': '語学', 'other': 'その他'
             };
 
-            // Add log
-            if (db && userId) {
-                const logColRef = collection(db, "artifacts", appId, "users", userId, "studyLogs");
-                await addDoc(logColRef, {
-                    timestamp: serverTimestamp(),
-                    stampType: typeNames[type],
-                });
-            }
+            // Add log (timestamp in milliseconds for local storage)
+            const newLog = {
+                timestamp: Date.now(),
+                stampType: typeNames[type],
+            };
+            
+            // Study logs are stored as an array in gameState
+            const newStudyLogs = [...(gameState.studyLogs || []), newLog];
 
-            // Grant gacha ticket and update state
-            await updateGameState({
-                gachaTickets: gameState.gachaTickets + 1
+            // Update State (including gacha ticket grant)
+            updateGameState({
+                gachaTickets: gameState.gachaTickets + 1,
+                studyLogs: newStudyLogs,
             });
             
             showToast(`きょうもがんばったね！ (${typeNames[type]}) ガチャ券+1`, 'success');
@@ -490,7 +434,7 @@
             content.innerHTML = stampHtml + gachaHtml;
         }
 
-        window.pullGacha = async function(type) {
+        window.pullGacha = function(type) {
             if (gameState.gachaTickets <= 0) {
                 showToast("ガチャ券が足りません！", 'error');
                 return;
@@ -509,7 +453,7 @@
                     break;
                 }
             }
-            if (!selectedRarity) selectedRarity = 'N'; // Fallback
+            if (!selectedRarity) selectedRarity = 'N';
 
             // 2. Select Item of that Rarity
             const availableItems = ITEMS[type].filter(item => item.rarity === selectedRarity);
@@ -528,14 +472,14 @@
                     id: selectedItemData.id,
                     type: type,
                     plus: 0,
-                    itemId: crypto.randomUUID(),
+                    itemId: crypto.randomUUID(), // Unique ID for equipping
                 };
                 gameState.inventory.push(newItem);
                 showToast(`[${selectedRarity}] ${selectedItemData.name} を新しく入手！`, selectedRarity === 'L' ? 'info' : 'success');
             }
 
             // 4. Update Game State
-            await updateGameState({
+            updateGameState({
                 gachaTickets: gameState.gachaTickets - 1,
                 inventory: gameState.inventory
             });
@@ -641,7 +585,7 @@
             content.innerHTML = statHtml + equipHtml + inventoryHtml;
         }
 
-        window.enhanceItem = async function(itemId) {
+        window.enhanceItem = function(itemId) {
             if (gameState.enhancementItems <= 0) {
                 showToast("強化アイテムがありません。", 'error');
                 return;
@@ -652,7 +596,7 @@
 
             gameState.inventory[itemIndex].plus = (gameState.inventory[itemIndex].plus || 0) + 1;
             
-            await updateGameState({
+            updateGameState({
                 inventory: gameState.inventory,
                 enhancementItems: gameState.enhancementItems - 1,
             });
@@ -661,7 +605,7 @@
             showToast(`${itemData.name}が+${gameState.inventory[itemIndex].plus}に強化されました！`, 'success');
         };
 
-        window.toggleEquip = async function(itemId) {
+        window.toggleEquip = function(itemId) {
             const itemEntry = gameState.inventory.find(inv => inv.itemId === itemId);
             if (!itemEntry) return;
             const type = itemEntry.type;
@@ -669,7 +613,6 @@
             let updates = {};
             let action = 'equip';
 
-            // 1. Check if item is currently equipped
             let slotToUnequip = null;
             let slotToEquip = null;
 
@@ -684,7 +627,7 @@
 
             if (action === 'unequip') {
                 // Unequip action
-                updates[`equipment.${slotToUnequip}`] = null;
+                updates.equipment = { ...gameState.equipment, [slotToUnequip]: null };
             } else {
                 // Equip action
                 const slotsForType = {
@@ -699,10 +642,10 @@
                     // If all slots of this type are full, overwrite the first one (simple logic)
                     slotToEquip = slotsForType[0];
                 }
-                updates[`equipment.${slotToEquip}`] = itemId;
+                updates.equipment = { ...gameState.equipment, [slotToEquip]: itemId };
             }
 
-            await updateGameState(updates);
+            updateGameState(updates);
             showToast(action === 'equip' ? `${itemEntry.name}を装備しました。` : `${itemEntry.name}の装備を解除しました。`, 'info');
         };
 
@@ -793,7 +736,9 @@
             // Check for Boss Condition
             if (gameState.killsUntilBoss <= 0) {
                 // Boss
-                const bossData = MONSTERS_BY_STAGE[gameState.stage + MONSTERS_BY_STAGE.length - 3];
+                // MONSTERS_BY_STAGEの構造上、ボスデータは末尾から2つ目/1つ目にある
+                const bossDataIndex = gameState.stage === 1 ? MONSTERS_BY_STAGE.length - 2 : MONSTERS_BY_STAGE.length - 1;
+                const bossData = MONSTERS_BY_STAGE[bossDataIndex];
                 monsters.push({ ...bossData, hp: bossData.hp, maxHp: bossData.hp });
             } else {
                 // 3 regular monsters
@@ -822,7 +767,7 @@
             }
         }
 
-        window.playerAttack = async function() {
+        window.playerAttack = function() {
             if (gameState.currentHp <= 0) {
                 showToast("戦闘不能です。", 'error');
                 return;
@@ -830,13 +775,13 @@
 
             const activeMonsters = gameState.currentMonsters.filter(m => m.hp > 0);
             if (activeMonsters.length === 0) {
-                await checkStageCompletion();
+                checkStageCompletion();
                 return;
             }
 
             // 1. Player Attack Phase (Target the first alive monster)
             const targetIndex = gameState.currentMonsters.findIndex(m => m.hp > 0);
-            if (targetIndex === -1) return; // Should not happen
+            if (targetIndex === -1) return;
 
             const targetMonster = gameState.currentMonsters[targetIndex];
             const playerDmg = Math.max(1, gameState.totalAttack - targetMonster.def);
@@ -844,10 +789,12 @@
 
             appendLog(`主人公の攻撃！ ${targetMonster.name}に ${playerDmg} のダメージ！`, true);
 
+            let monsterDefeated = false;
             // Check if monster is defeated
             if (targetMonster.hp <= 0) {
                 targetMonster.hp = 0;
                 appendLog(`🎉 ${targetMonster.name} を撃破した！`, true);
+                monsterDefeated = true;
                 
                 // Drop items and check boss progress
                 gameState.enhancementItems += targetMonster.itemDrop;
@@ -856,20 +803,21 @@
                 if (gameState.killsUntilBoss > 0) {
                     gameState.killsUntilBoss--;
                 }
-                
-                await checkStageCompletion();
-                if (gameState.currentMonsters.filter(m => m.hp > 0).length === 0) {
-                    await updateGameState({
-                        currentMonsters: gameState.currentMonsters,
-                        enhancementItems: gameState.enhancementItems,
-                        killsUntilBoss: gameState.killsUntilBoss,
-                    });
-                    renderCombatTab();
-                    return; // Skip monster attack if all are defeated
-                }
+            }
+            
+            // Check for immediate completion (e.g. one-shotting the last monster)
+            if (gameState.currentMonsters.filter(m => m.hp > 0).length === 0) {
+                updateGameState({
+                    currentMonsters: gameState.currentMonsters,
+                    enhancementItems: gameState.enhancementItems,
+                    killsUntilBoss: gameState.killsUntilBoss,
+                });
+                checkStageCompletion();
+                return; 
             }
 
             // 2. Monster Attack Phase (All alive monsters attack sequentially)
+            let playerFainted = false;
             for (let i = 0; i < gameState.currentMonsters.length; i++) {
                 const monster = gameState.currentMonsters[i];
                 if (monster.hp > 0) {
@@ -881,31 +829,27 @@
                     if (gameState.currentHp <= 0) {
                         gameState.currentHp = 0;
                         appendLog(`💀 主人公は戦闘不能になった...`, false);
+                        playerFainted = true;
                         break;
                     }
                 }
             }
 
             // 3. Update State and UI
-            if (gameState.currentHp <= 0) {
-                await updateGameState({
-                    currentHp: 0,
-                    currentMonsters: gameState.currentMonsters,
-                    enhancementItems: gameState.enhancementItems,
-                    killsUntilBoss: gameState.killsUntilBoss,
-                });
-            } else {
-                await updateGameState({
-                    currentHp: gameState.currentHp,
-                    currentMonsters: gameState.currentMonsters,
-                    enhancementItems: gameState.enhancementItems,
-                    killsUntilBoss: gameState.killsUntilBoss,
-                });
+            updateGameState({
+                currentHp: gameState.currentHp,
+                currentMonsters: gameState.currentMonsters,
+                enhancementItems: gameState.enhancementItems,
+                killsUntilBoss: gameState.killsUntilBoss,
+            });
+
+            if (!playerFainted && monsterDefeated) {
+                // If a monster was defeated but others are still alive, check stage completion for boss spawn
+                checkStageCompletion(); 
             }
-            renderCombatTab();
         };
 
-        async function checkStageCompletion() {
+        function checkStageCompletion() {
             const allMonstersDefeated = gameState.currentMonsters.filter(m => m.hp > 0).length === 0;
             
             if (!allMonstersDefeated) return;
@@ -918,23 +862,23 @@
                 const nextStage = gameState.stage + 1;
                 if (nextStage <= MONSTERS_BY_STAGE.length - 2) { // Max stage check
                     showToast(`🏆 ステージ${gameState.stage}をクリア！次のステージへ！`, 'info');
-                    await updateGameState({
+                    updateGameState({
                         stage: nextStage,
                         killsUntilBoss: 10,
                         currentMonsters: [],
                     });
                 } else {
                     showToast("🎉 全てのステージをクリア！君は最強だ！", 'info');
-                    await updateGameState({ currentMonsters: [] });
+                    updateGameState({ currentMonsters: [] });
                 }
             } else if (gameState.killsUntilBoss <= 0) {
                 // Regular monsters defeated, and boss threshold reached: Spawn Boss
                 showToast("🚨 強力な魔力の気配...ステージボスが出現した！", 'error');
-                await updateGameState({ currentMonsters: [] }); // Clear and re-init will spawn boss
+                updateGameState({ currentMonsters: [] }); // Clear and re-init will spawn boss
             } else {
                 // Regular monsters defeated, reset 3 new ones
                 showToast("敵を全て倒した！新たな敵が現れた。", 'success');
-                await updateGameState({ currentMonsters: [] });
+                updateGameState({ currentMonsters: [] });
             }
             
             // Re-render to initialize new monsters/stage
@@ -945,7 +889,8 @@
 
         function renderRecordTab() {
             const content = document.getElementById('tab-record-content');
-            const logs = gameState.studyLogs || [];
+            // Log array is sorted in place for rendering purposes (latest first)
+            const logs = [...(gameState.studyLogs || [])].sort((a, b) => b.timestamp - a.timestamp);
 
             const recordHtml = `
                 <h2 class="text-2xl font-semibold mb-4 text-primary">勉強記録ページ</h2>
@@ -953,7 +898,7 @@
                     ${logs.length === 0 
                         ? '<p class="text-center text-gray-400">まだ勉強記録がありません。スタンプを押して記録しましょう！</p>' 
                         : logs.map(log => {
-                            const date = log.timestamp ? new Date(log.timestamp.seconds * 1000).toLocaleString('ja-JP', { dateStyle: 'medium', timeStyle: 'short' }) : '日付不明';
+                            const date = new Date(log.timestamp).toLocaleString('ja-JP', { dateStyle: 'medium', timeStyle: 'short' });
                             const bgColor = {
                                 '数学': 'bg-blue-600', 'プログラミング': 'bg-green-600', '語学': 'bg-yellow-600', 'その他': 'bg-purple-600'
                             }[log.stampType] || 'bg-gray-600';
