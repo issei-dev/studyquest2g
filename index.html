@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>勉強RPG：ローカル保存</title>
+    <title>勉強RPG：画像対応・アニメーション版</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -47,6 +47,48 @@
         .rarity-sr { background-color: #a855f7; } /* Super Rare (Purple) */
         .rarity-ur { background-color: #f59e0b; } /* Ultra Rare (Gold) */
         .rarity-l { background-color: #ef4444; } /* Legendary (Red) */
+        
+        /* 画像表示用スタイル */
+        .item-icon, .monster-icon {
+            width: 50px;
+            height: 50px;
+            object-fit: contain;
+            border-radius: 4px;
+        }
+        .monster-icon {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto;
+            display: block;
+        }
+
+
+        /* 攻撃時の揺れアニメーション */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+            transform: translate3d(0, 0, 0);
+            backface-visibility: hidden;
+            perspective: 1000px;
+        }
+
+        /* モーダル背景 */
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.7);
+        }
     </style>
 </head>
 <body class="font-sans">
@@ -54,9 +96,20 @@
     <!-- Toast Notification Area -->
     <div id="toast-container" class="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 space-y-2"></div>
 
+    <!-- Modal for Gacha/Stamp Confirmation -->
+    <div id="rpg-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center modal-overlay">
+        <div class="bg-rpg-card p-6 rounded-xl shadow-2xl max-w-sm w-full border-2 border-primary transform scale-90 transition-transform duration-300" id="modal-content-container">
+            <h3 id="modal-title" class="text-xl font-bold mb-4 text-primary">メッセージ</h3>
+            <p id="modal-message" class="mb-6 text-gray-200"></p>
+            <div class="flex justify-center">
+                <button id="modal-ok-button" class="rpg-button bg-secondary hover:bg-emerald-600 text-white font-bold py-2 px-6 rounded-xl text-lg">OK</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Main Container -->
     <div class="max-w-4xl mx-auto p-4 md:p-8">
-        <h1 class="text-3xl font-bold text-center text-secondary mb-6">📚 勉強RPG (ローカル保存版) ⚔️</h1>
+        <h1 class="text-3xl font-bold text-center text-secondary mb-6">📚 勉強RPG (画像対応版) ⚔️</h1>
         
         <!-- Info Banner for Local Storage -->
         <div class="bg-yellow-800 p-3 rounded-lg shadow-lg mb-6 text-sm text-yellow-100">
@@ -95,54 +148,61 @@
 
         let gameState = {};
         const LOCAL_STORAGE_KEY = 'studyRpgGameState';
+        let isModalOpen = false; // モーダル開閉状態を管理するフラグ
 
         const rarityWeights = {
-            'L': 1, // Legendary (1%)
-            'UR': 4, // Ultra Rare (4%)
-            'SR': 15, // Super Rare (15%)
-            'R': 30, // Rare (30%)
-            'N': 50, // Normal (50%)
+            'L': 1, 
+            'UR': 4,
+            'SR': 15,
+            'R': 30,
+            'N': 50,
         };
+
+        // --- 画像表示のための設定 ---
+        // ユーザーが画像をアップロードする際の置き換え場所として、プレースホルダーURLを使用します。
+        // ユーザーはこれらのURLをBase64データURI、または有効な画像URLに置き換えることができます。
+        const ITEM_BASE_URL = "https://placehold.co/50x50/374151/f3f4f6?font=inter&text=";
+        const MONSTER_BASE_URL = "https://placehold.co/60x60/1f2937/ef4444?font=inter&text=";
 
         const ITEMS = {
             weapon: [
-                { id: 'w1', name: '木の剣', rarity: 'N', atk: 5, def: 0 },
-                { id: 'w2', name: '鉄の剣', rarity: 'R', atk: 15, def: 0 },
-                { id: 'w3', name: '鋼の剣', rarity: 'SR', atk: 30, def: 0 },
-                { id: 'w4', name: 'ミスリルソード', rarity: 'UR', atk: 60, def: 5 },
-                { id: 'w5', name: '聖剣エクスカリバー', rarity: 'L', atk: 120, def: 10 },
+                { id: 'w1', name: '木の剣', rarity: 'N', atk: 5, def: 0, icon: ITEM_BASE_URL + 'WPN1' },
+                { id: 'w2', name: '鉄の剣', rarity: 'R', atk: 15, def: 0, icon: ITEM_BASE_URL + 'WPN2' },
+                { id: 'w3', name: '鋼の剣', rarity: 'SR', atk: 30, def: 0, icon: ITEM_BASE_URL + 'WPN3' },
+                { id: 'w4', name: 'ミスリルソード', rarity: 'UR', atk: 60, def: 5, icon: ITEM_BASE_URL + 'WPN4' },
+                { id: 'w5', name: '聖剣エクスカリバー', rarity: 'L', atk: 120, def: 10, icon: ITEM_BASE_URL + 'WPN5' },
             ],
             armor: [
-                { id: 'a1', name: '布の服', rarity: 'N', atk: 0, def: 3 },
-                { id: 'a2', name: '革鎧', rarity: 'R', atk: 0, def: 10 },
-                { id: 'a3', name: '鎖帷子', rarity: 'SR', atk: 5, def: 25 },
-                { id: 'a4', name: 'プレートアーマー', rarity: 'UR', atk: 10, def: 50 },
-                { id: 'a5', name: 'ドラゴンメイル', rarity: 'L', atk: 20, def: 100 },
+                { id: 'a1', name: '布の服', rarity: 'N', atk: 0, def: 3, icon: ITEM_BASE_URL + 'ARM1' },
+                { id: 'a2', name: '革鎧', rarity: 'R', atk: 0, def: 10, icon: ITEM_BASE_URL + 'ARM2' },
+                { id: 'a3', name: '鎖帷子', rarity: 'SR', atk: 5, def: 25, icon: ITEM_BASE_URL + 'ARM3' },
+                { id: 'a4', name: 'プレートアーマー', rarity: 'UR', atk: 10, def: 50, icon: ITEM_BASE_URL + 'ARM4' },
+                { id: 'a5', name: 'ドラゴンメイル', rarity: 'L', atk: 20, def: 100, icon: ITEM_BASE_URL + 'ARM5' },
             ],
             pet: [
-                { id: 'p1', name: 'スライム', rarity: 'N', atk: 2, def: 2, hp: 5 },
-                { id: 'p2', name: '妖精ピクシー', rarity: 'R', atk: 5, def: 5, hp: 10 },
-                { id: 'p3', name: '守護犬ケルベロス', rarity: 'SR', atk: 10, def: 15, hp: 20 },
-                { id: 'p4', name: '賢者のフクロウ', rarity: 'UR', atk: 20, def: 10, hp: 40 },
-                { id: 'p5', name: '神竜ファフニール', rarity: 'L', atk: 50, def: 30, hp: 80 },
+                { id: 'p1', name: 'スライム', rarity: 'N', atk: 2, def: 2, hp: 5, icon: ITEM_BASE_URL + 'PET1' },
+                { id: 'p2', name: '妖精ピクシー', rarity: 'R', atk: 5, def: 5, hp: 10, icon: ITEM_BASE_URL + 'PET2' },
+                { id: 'p3', name: '守護犬ケルベロス', rarity: 'SR', atk: 10, def: 15, hp: 20, icon: ITEM_BASE_URL + 'PET3' },
+                { id: 'p4', name: '賢者のフクロウ', rarity: 'UR', atk: 20, def: 10, hp: 40, icon: ITEM_BASE_URL + 'PET4' },
+                { id: 'p5', name: '神竜ファフニール', rarity: 'L', atk: 50, def: 30, hp: 80, icon: ITEM_BASE_URL + 'PET5' },
             ]
         };
 
         const MONSTERS_BY_STAGE = [
             // Stage 1
             [
-                { name: '雑魚スライム', hp: 20, atk: 5, def: 0, exp: 5, itemDrop: 1 },
-                { name: 'ゴブリン', hp: 30, atk: 8, def: 2, exp: 10, itemDrop: 2 },
+                { name: '雑魚スライム', hp: 20, atk: 5, def: 0, exp: 5, itemDrop: 1, icon: MONSTER_BASE_URL + 'M-SLIME' },
+                { name: 'ゴブリン', hp: 30, atk: 8, def: 2, exp: 10, itemDrop: 2, icon: MONSTER_BASE_URL + 'M-GOBLIN' },
             ],
             // Stage 2
             [
-                { name: 'ウォーウルフ', hp: 50, atk: 15, def: 5, exp: 15, itemDrop: 3 },
-                { name: 'オーク', hp: 70, atk: 20, def: 8, exp: 20, itemDrop: 4 },
+                { name: 'ウォーウルフ', hp: 50, atk: 15, def: 5, exp: 15, itemDrop: 3, icon: MONSTER_BASE_URL + 'M-WOLF' },
+                { name: 'オーク', hp: 70, atk: 20, def: 8, exp: 20, itemDrop: 4, icon: MONSTER_BASE_URL + 'M-ORC' },
             ],
             // Boss for Stage 1 (Appears after 10 kills)
-            { name: 'ステージ1ボス：大鬼', hp: 200, atk: 30, def: 10, exp: 100, itemDrop: 10 },
+            { name: 'ステージ1ボス：大鬼', hp: 200, atk: 30, def: 10, exp: 100, itemDrop: 10, icon: MONSTER_BASE_URL + 'BOSS1' },
             // Boss for Stage 2
-            { name: 'ステージ2ボス：リザードマンロード', hp: 400, atk: 50, def: 20, exp: 200, itemDrop: 20 },
+            { name: 'ステージ2ボス：リザードマンロード', hp: 400, atk: 50, def: 20, exp: 200, itemDrop: 20, icon: MONSTER_BASE_URL + 'BOSS2' },
         ];
 
         const INITIAL_STATE = {
@@ -154,7 +214,7 @@
             baseAttack: 10,
             baseDefense: 5,
             killsUntilBoss: 10,
-            inventory: [], // [{ id: 'w1', type: 'weapon', plus: 0, itemId: 'unique_id' }]
+            inventory: [],
             equipment: {
                 weapon1: null,
                 weapon2: null,
@@ -163,9 +223,9 @@
                 pet2: null,
                 pet3: null,
             },
-            currentMonsters: [], // { name, hp, maxHp }
+            currentMonsters: [], 
             lastLoginDate: new Date().toDateString(),
-            studyLogs: [], // [{ timestamp: number, stampType: string }]
+            studyLogs: [],
         };
 
         // --- Local Storage Management ---
@@ -174,7 +234,6 @@
             const savedState = localStorage.getItem(LOCAL_STORAGE_KEY);
             if (savedState) {
                 try {
-                    // 既存の gameState と結合して、新しいプロパティにも対応
                     const parsedState = JSON.parse(savedState);
                     gameState = { ...INITIAL_STATE, ...parsedState };
                 } catch (e) {
@@ -202,6 +261,9 @@
 
             // 2. Initial Setup
             setupApp();
+            
+            // 3. Setup Modal OK button listener
+            document.getElementById('modal-ok-button').addEventListener('click', hideModal);
         };
 
         function setupApp() {
@@ -247,6 +309,14 @@
             gameState.totalDefense = totalDef;
             gameState.totalMaxHp = totalMaxHp;
 
+            // Update current HP to not exceed max HP
+            if (gameState.currentHp > gameState.totalMaxHp) {
+                gameState.currentHp = gameState.totalMaxHp;
+            }
+            if (gameState.currentHp < 0) {
+                gameState.currentHp = 0;
+            }
+
             // UI update
             document.getElementById('stage-display').textContent = gameState.stage;
             document.getElementById('gacha-tickets-display').textContent = gameState.gachaTickets;
@@ -279,6 +349,43 @@
                 showToast("戦闘不能！明日の回復を待とう。", 'error');
             }
         }
+
+        // --- Modal/Dialog Functions ---
+
+        function showModal(title, message) {
+            if (isModalOpen) return;
+            
+            const modal = document.getElementById('rpg-modal');
+            const titleEl = document.getElementById('modal-title');
+            const messageEl = document.getElementById('modal-message');
+            const contentContainer = document.getElementById('modal-content-container');
+
+            titleEl.textContent = title;
+            messageEl.innerHTML = message;
+
+            // Show modal and apply animation
+            modal.classList.remove('hidden');
+            contentContainer.classList.remove('scale-90');
+            contentContainer.classList.add('scale-100');
+            isModalOpen = true;
+        }
+
+        function hideModal() {
+            const modal = document.getElementById('rpg-modal');
+            const contentContainer = document.getElementById('modal-content-container');
+
+            // Apply fade/shrink animation
+            contentContainer.classList.remove('scale-100');
+            contentContainer.classList.add('scale-90');
+
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                isModalOpen = false;
+                // モーダルが閉じたら、studyタブを再レンダリングしてボタンを有効にする
+                renderStudyTab();
+            }, 300); // Wait for transition
+        }
+
 
         // --- UI Rendering ---
 
@@ -354,56 +461,62 @@
         function getItemDetails(itemId, type) {
             const itemArray = ITEMS[type];
             if (!itemArray || !Array.isArray(itemArray)) {
-                return { name: '不明なアイテム', rarity: 'N', atk: 0, def: 0, hp: 0 };
+                return { name: '不明なアイテム', rarity: 'N', atk: 0, def: 0, hp: 0, icon: 'https://placehold.co/50x50/6b7280/f3f4f6?text=?' };
             }
             const item = itemArray.find(i => i.id === itemId);
-            return item || { name: '不明なアイテム', rarity: 'N', atk: 0, def: 0, hp: 0 };
+            return item || { name: '不明なアイテム', rarity: 'N', atk: 0, def: 0, hp: 0, icon: 'https://placehold.co/50x50/6b7280/f3f4f6?text=?' };
         }
 
         // --- TAB 1: Study & Gacha ---
 
         window.stampStudy = function(type) {
+            if (isModalOpen) return;
+            
             const typeNames = {
                 'math': '数学', 'code': 'プログラミング', 'lang': '語学', 'other': 'その他'
             };
 
-            // Add log (timestamp in milliseconds for local storage)
+            // Add log
             const newLog = {
                 timestamp: Date.now(),
                 stampType: typeNames[type],
             };
             
-            // Study logs are stored as an array in gameState
             const newStudyLogs = [...(gameState.studyLogs || []), newLog];
 
-            // Update State (including gacha ticket grant)
+            // Update State
             updateGameState({
                 gachaTickets: gameState.gachaTickets + 1,
                 studyLogs: newStudyLogs,
             });
             
-            showToast(`きょうもがんばったね！ (${typeNames[type]}) ガチャ券+1`, 'success');
+            // モーダルを表示し、OKを押すまで次の操作をブロック
+            showModal("スタンプ完了！", `きょうもがんばったね！ (${typeNames[type]}) ガチャ券<span class="text-yellow-400 font-bold ml-1">+1</span> を獲得した！`);
+            renderStudyTab();
         };
 
         function renderStudyTab() {
             const content = document.getElementById('tab-study-content');
             
+            // ボタンの有効/無効状態を管理 (isModalOpen中は無効)
+            const buttonDisabled = isModalOpen ? 'disabled bg-gray-500 cursor-not-allowed' : '';
+
             // Study Stamp Section
             const stampHtml = `
                 <div class="mb-8 border-b border-rpg-border pb-4">
                     <h2 class="text-2xl font-semibold mb-4 text-primary">勉強スタンプ機能</h2>
                     <p class="mb-4 text-sm text-gray-400">勉強内容に合わせてスタンプを押すと、ガチャ券がもらえます。</p>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <button onclick="stampStudy('math')" class="rpg-button bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl text-lg">
+                        <button onclick="stampStudy('math')" class="rpg-button bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl text-lg ${buttonDisabled}">
                             🔢 数学
                         </button>
-                        <button onclick="stampStudy('code')" class="rpg-button bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl text-lg">
+                        <button onclick="stampStudy('code')" class="rpg-button bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl text-lg ${buttonDisabled}">
                             💻 プログラミング
                         </button>
-                        <button onclick="stampStudy('lang')" class="rpg-button bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 rounded-xl text-lg">
+                        <button onclick="stampStudy('lang')" class="rpg-button bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 rounded-xl text-lg ${buttonDisabled}">
                             🗣️ 語学
                         </button>
-                        <button onclick="stampStudy('other')" class="rpg-button bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl text-lg">
+                        <button onclick="stampStudy('other')" class="rpg-button bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl text-lg ${buttonDisabled}">
                             ⭐ その他
                         </button>
                     </div>
@@ -411,17 +524,18 @@
             `;
 
             // Gacha Section
+            const canPullGacha = gameState.gachaTickets > 0 && !isModalOpen;
             const gachaHtml = `
                 <div>
                     <h2 class="text-2xl font-semibold mb-4 text-primary">ガチャ機能</h2>
                     <p class="mb-4 text-sm text-gray-400">現在、ガチャ券: <span class="text-yellow-400 font-bold">${gameState.gachaTickets}</span>枚</p>
                     <div class="grid grid-cols-2 gap-4">
-                        <button onclick="pullGacha('weapon')" ${gameState.gachaTickets > 0 ? '' : 'disabled'}
-                                class="rpg-button ${gameState.gachaTickets > 0 ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-500 cursor-not-allowed'} text-white font-bold py-4 rounded-xl text-xl">
+                        <button onclick="pullGacha('weapon')" ${canPullGacha ? '' : 'disabled'}
+                                class="rpg-button ${canPullGacha ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-500 cursor-not-allowed'} text-white font-bold py-4 rounded-xl text-xl ${buttonDisabled}">
                             ⚔️ 武器ガチャ (1枚消費)
                         </button>
-                        <button onclick="pullGacha('pet')" ${gameState.gachaTickets > 0 ? '' : 'disabled'}
-                                class="rpg-button ${gameState.gachaTickets > 0 ? 'bg-teal-600 hover:bg-teal-700' : 'bg-gray-500 cursor-not-allowed'} text-white font-bold py-4 rounded-xl text-xl">
+                        <button onclick="pullGacha('pet')" ${canPullGacha ? '' : 'disabled'}
+                                class="rpg-button ${canPullGacha ? 'bg-teal-600 hover:bg-teal-700' : 'bg-gray-500 cursor-not-allowed'} text-white font-bold py-4 rounded-xl text-xl ${buttonDisabled}">
                             🐾 ペットガチャ (1枚消費)
                         </button>
                     </div>
@@ -435,6 +549,7 @@
         }
 
         window.pullGacha = function(type) {
+            if (isModalOpen) return;
             if (gameState.gachaTickets <= 0) {
                 showToast("ガチャ券が足りません！", 'error');
                 return;
@@ -444,7 +559,7 @@
             const rand = Math.random() * 100;
             let cumulativeWeight = 0;
             let selectedRarity = null;
-            const rarities = Object.keys(rarityWeights).reverse(); // L, UR, SR, R, N
+            const rarities = Object.keys(rarityWeights).reverse();
 
             for (const rarity of rarities) {
                 cumulativeWeight += rarityWeights[rarity];
@@ -462,10 +577,18 @@
             // 3. Check Inventory for Duplicates
             const existingItemIndex = gameState.inventory.findIndex(inv => inv.id === selectedItemData.id);
 
+            let message = "";
+
             if (existingItemIndex !== -1) {
                 // Duplicate: Increase plus value
                 gameState.inventory[existingItemIndex].plus = (gameState.inventory[existingItemIndex].plus || 0) + 1;
-                showToast(`[+${gameState.inventory[existingItemIndex].plus}] ${selectedItemData.name} を入手！強化されました！`, selectedRarity === 'L' ? 'info' : 'success');
+                message = `
+                    <div class="flex items-center justify-center mb-3">
+                        <img src="${selectedItemData.icon}" alt="アイテム画像" class="item-icon mr-4">
+                        <span class="text-yellow-400">${selectedItemData.name}</span>を入手！
+                    </div>
+                    <span class="text-orange-400">強化値が +${gameState.inventory[existingItemIndex].plus} になりました！</span>
+                `;
             } else {
                 // New Item: Add to inventory
                 const newItem = {
@@ -475,7 +598,14 @@
                     itemId: crypto.randomUUID(), // Unique ID for equipping
                 };
                 gameState.inventory.push(newItem);
-                showToast(`[${selectedRarity}] ${selectedItemData.name} を新しく入手！`, selectedRarity === 'L' ? 'info' : 'success');
+                message = `
+                    <div class="flex items-center justify-center mb-3">
+                        <img src="${selectedItemData.icon}" alt="アイテム画像" class="item-icon mr-4">
+                        <span class="${getRarityClass(selectedRarity)} text-base mr-2">${selectedRarity}</span>
+                        <span class="text-yellow-400 text-lg font-bold">${selectedItemData.name}</span>
+                    </div>
+                    を新しく入手した！
+                `;
             }
 
             // 4. Update Game State
@@ -483,6 +613,10 @@
                 gachaTickets: gameState.gachaTickets - 1,
                 inventory: gameState.inventory
             });
+            
+            // Show modal instead of toast
+            showModal("ガチャ結果発表！", message);
+            renderStudyTab();
         };
 
         // --- TAB 2: Inventory & Equipment ---
@@ -506,12 +640,12 @@
 
             // --- B. Equipment Slots ---
             const slots = {
-                weapon1: { label: '武器1', icon: '⚔️' },
-                weapon2: { label: '武器2', icon: '🗡️' },
-                armor: { label: '防具', icon: '🛡️' },
-                pet1: { label: 'ペット1', icon: '🐾' },
-                pet2: { label: 'ペット2', icon: '🐾' },
-                pet3: { label: 'ペット3', icon: '🐾' },
+                weapon1: { label: '武器1', defaultIcon: '⚔️' },
+                weapon2: { label: '武器2', defaultIcon: '🗡️' },
+                armor: { label: '防具', defaultIcon: '🛡️' },
+                pet1: { label: 'ペット1', defaultIcon: '🐾' },
+                pet2: { label: 'ペット2', defaultIcon: '🐾' },
+                pet3: { label: 'ペット3', defaultIcon: '🐾' },
             };
 
             const equipHtml = `
@@ -524,16 +658,23 @@
                             
                             let itemDisplay = '<span class="text-gray-400">未装備</span>';
                             let itemClass = 'bg-gray-700';
+                            let itemIconHtml = `<span class="text-xl mr-2">${slotInfo.defaultIcon}</span>`;
+
                             if (equippedItemEntry) {
                                 const itemData = getItemDetails(equippedItemEntry.id, equippedItemEntry.type);
                                 itemDisplay = `${itemData.name} +${equippedItemEntry.plus}`;
                                 itemClass = `bg-primary`;
+                                // 画像表示: 装備アイテムの画像を表示
+                                itemIconHtml = `<img src="${itemData.icon}" alt="${itemData.name}" class="item-icon w-6 h-6 mr-2">`;
                             }
 
                             return `
-                                <div class="p-3 rounded-lg ${itemClass} shadow-md flex justify-between items-center text-sm md:text-base">
-                                    <span class="font-bold">${slotInfo.icon} ${slotInfo.label}:</span>
-                                    <span class="truncate ml-2">${itemDisplay}</span>
+                                <div class="p-3 rounded-lg ${itemClass} shadow-md flex justify-start items-center text-sm md:text-base">
+                                    ${itemIconHtml}
+                                    <div class="flex flex-col">
+                                        <span class="font-bold text-xs">${slotInfo.label}:</span>
+                                        <span class="truncate">${itemDisplay}</span>
+                                    </div>
                                 </div>
                             `;
                         }).join('')}
@@ -554,11 +695,13 @@
                                 ? `HP+${itemData.hp}, ATK+${itemData.atk}, DEF+${itemData.def}`
                                 : `ATK+${itemData.atk}, DEF+${itemData.def}`;
                             const typeLabel = itemEntry.type === 'weapon' ? '武器' : (itemEntry.type === 'armor' ? '防具' : 'ペット');
-                            const canEnhance = gameState.enhancementItems > 0 && itemEntry.plus < 100; // Limit enhancement for sanity
+                            const canEnhance = gameState.enhancementItems > 0 && itemEntry.plus < 100;
 
                             return `
                                 <div class="bg-rpg-border p-3 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center shadow-lg">
                                     <div class="flex items-center mb-2 md:mb-0 w-full md:w-3/5">
+                                        <!-- 画像表示: インベントリアイテムの画像 -->
+                                        <img src="${itemData.icon}" alt="${itemData.name}" class="item-icon mr-2">
                                         <span class="${getRarityClass(itemData.rarity)} mr-2">${itemData.rarity}</span>
                                         <span class="font-extrabold text-lg mr-2">${itemData.name}</span>
                                         <span class="text-yellow-400 font-bold text-xl">+${itemEntry.plus}</span>
@@ -639,7 +782,7 @@
                 // Find the first empty slot or the first occupied slot of the same type to overwrite
                 slotToEquip = slotsForType.find(slot => !gameState.equipment[slot]);
                 if (!slotToEquip) {
-                    // If all slots of this type are full, overwrite the first one (simple logic)
+                    // If all slots of this type are full, overwrite the first one (simple logic: overwrite slot 1)
                     slotToEquip = slotsForType[0];
                 }
                 updates.equipment = { ...gameState.equipment, [slotToEquip]: itemId };
@@ -650,6 +793,21 @@
         };
 
         // --- TAB 3: Combat ---
+        
+        // HPバーに揺れアニメーションを適用・解除する関数
+        function applyShake(elementId) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.classList.remove('shake');
+                // DOMの再描画を強制するためのトリック
+                void element.offsetWidth;
+                element.classList.add('shake');
+                setTimeout(() => {
+                    element.classList.remove('shake');
+                }, 500); // アニメーション時間に合わせて解除
+            }
+        }
+
 
         function renderCombatTab() {
             calculateStats();
@@ -672,16 +830,17 @@
             }
 
             // Stat Display (detailed)
+            const hpPercent = Math.max(0, (gameState.currentHp / gameState.totalMaxHp) * 100);
             const statHtml = `
                 <div class="mb-6 border-b border-rpg-border pb-4">
                     <h2 class="text-2xl font-semibold mb-3 text-primary">主人公ステータス</h2>
-                    <div class="bg-gray-600 p-3 rounded-lg shadow-inner">
+                    <div id="player-hp-bar" class="bg-gray-600 p-3 rounded-lg shadow-inner">
                         <div class="flex justify-between items-center mb-1">
-                            <span class="font-bold">HP:</span>
+                            <span class="font-bold">主人公 HP:</span>
                             <span class="font-mono text-hp-red">${gameState.currentHp} / ${gameState.totalMaxHp}</span>
                         </div>
                         <div class="w-full bg-gray-700 rounded-full h-3">
-                            <div class="bg-hp-red h-3 rounded-full" style="width: ${Math.max(0, (gameState.currentHp / gameState.totalMaxHp) * 100)}%"></div>
+                            <div class="bg-hp-red h-3 rounded-full" style="width: ${hpPercent}%"></div>
                         </div>
                         <div class="flex justify-around mt-2 text-sm">
                             <p>ATK: <span class="text-red-400 font-bold">${gameState.totalAttack}</span></p>
@@ -700,11 +859,15 @@
                         ${gameState.currentMonsters.map((m, index) => {
                             const hpPercent = Math.max(0, (m.hp / m.maxHp) * 100);
                             return `
-                                <div id="monster-${index}" class="bg-rpg-border p-3 rounded-lg shadow-lg ${m.hp <= 0 ? 'opacity-50' : ''}">
-                                    <p class="font-bold text-lg">${m.name} ${m.hp <= 0 ? '(撃破)' : ''}</p>
-                                    <p class="text-sm">HP: <span class="font-mono">${Math.max(0, m.hp)} / ${m.maxHp}</span></p>
-                                    <div class="w-full bg-gray-700 rounded-full h-2 my-1">
-                                        <div class="bg-yellow-400 h-2 rounded-full" style="width: ${hpPercent}%"></div>
+                                <div id="monster-card-${index}" class="bg-rpg-border p-3 rounded-lg shadow-lg ${m.hp <= 0 ? 'opacity-50' : ''}">
+                                    <!-- 画像表示: モンスターの画像 -->
+                                    <img src="${m.icon}" alt="${m.name}" class="monster-icon mb-1">
+                                    <p class="font-bold text-lg text-center">${m.name} ${m.hp <= 0 ? '(撃破)' : ''}</p>
+                                    <div id="monster-hp-bar-${index}">
+                                        <p class="text-sm">HP: <span class="font-mono">${Math.max(0, m.hp)} / ${m.maxHp}</span></p>
+                                        <div class="w-full bg-gray-700 rounded-full h-2 my-1">
+                                            <div class="bg-yellow-400 h-2 rounded-full" style="width: ${hpPercent}%"></div>
+                                        </div>
                                     </div>
                                     <p class="text-xs">ATK:${m.atk} / DEF:${m.def}</p>
                                 </div>
@@ -731,20 +894,19 @@
 
         function initializeMonsters() {
             const monsters = [];
-            const stageMonsters = MONSTERS_BY_STAGE[gameState.stage - 1];
+            const stageIndex = gameState.stage - 1;
+            const stageMonsters = MONSTERS_BY_STAGE[stageIndex];
             
-            // Check for Boss Condition
             if (gameState.killsUntilBoss <= 0) {
                 // Boss
-                // MONSTERS_BY_STAGEの構造上、ボスデータは末尾から2つ目/1つ目にある
                 const bossDataIndex = gameState.stage === 1 ? MONSTERS_BY_STAGE.length - 2 : MONSTERS_BY_STAGE.length - 1;
                 const bossData = MONSTERS_BY_STAGE[bossDataIndex];
-                monsters.push({ ...bossData, hp: bossData.hp, maxHp: bossData.hp });
+                monsters.push({ ...bossData, hp: bossData.hp, maxHp: bossData.hp, icon: bossData.icon });
             } else {
                 // 3 regular monsters
                 for (let i = 0; i < 3; i++) {
                     const monsterData = stageMonsters[Math.floor(Math.random() * stageMonsters.length)];
-                    monsters.push({ ...monsterData, hp: monsterData.hp, maxHp: monsterData.hp });
+                    monsters.push({ ...monsterData, hp: monsterData.hp, maxHp: monsterData.hp, icon: monsterData.icon });
                 }
             }
 
@@ -773,22 +935,20 @@
                 return;
             }
 
-            const activeMonsters = gameState.currentMonsters.filter(m => m.hp > 0);
-            if (activeMonsters.length === 0) {
+            // 1. Player Attack Phase (Target the first alive monster)
+            const targetIndex = gameState.currentMonsters.findIndex(m => m.hp > 0);
+            if (targetIndex === -1) {
                 checkStageCompletion();
                 return;
             }
-
-            // 1. Player Attack Phase (Target the first alive monster)
-            const targetIndex = gameState.currentMonsters.findIndex(m => m.hp > 0);
-            if (targetIndex === -1) return;
 
             const targetMonster = gameState.currentMonsters[targetIndex];
             const playerDmg = Math.max(1, gameState.totalAttack - targetMonster.def);
             targetMonster.hp -= playerDmg;
 
             appendLog(`主人公の攻撃！ ${targetMonster.name}に ${playerDmg} のダメージ！`, true);
-
+            applyShake(`monster-hp-bar-${targetIndex}`); // モンスターHPバーを揺らす
+            
             let monsterDefeated = false;
             // Check if monster is defeated
             if (targetMonster.hp <= 0) {
@@ -805,7 +965,7 @@
                 }
             }
             
-            // Check for immediate completion (e.g. one-shotting the last monster)
+            // Check for immediate completion
             if (gameState.currentMonsters.filter(m => m.hp > 0).length === 0) {
                 updateGameState({
                     currentMonsters: gameState.currentMonsters,
@@ -823,6 +983,10 @@
                 if (monster.hp > 0) {
                     const monsterDmg = Math.max(1, monster.atk - gameState.totalDefense);
                     gameState.currentHp -= monsterDmg;
+                    
+                    if (gameState.currentHp > 0) {
+                        applyShake('player-hp-bar'); // 主人公HPバーを揺らす
+                    }
 
                     appendLog(`${monster.name} の攻撃！ ${monsterDmg} のダメージを受けた！`);
 
@@ -844,7 +1008,6 @@
             });
 
             if (!playerFainted && monsterDefeated) {
-                // If a monster was defeated but others are still alive, check stage completion for boss spawn
                 checkStageCompletion(); 
             }
         };
@@ -854,13 +1017,12 @@
             
             if (!allMonstersDefeated) return;
 
-            // Check if the defeated monster was a boss
             const isBoss = gameState.currentMonsters.some(m => m.name.includes('ボス'));
 
             if (isBoss) {
                 // Boss defeated: Advance Stage
                 const nextStage = gameState.stage + 1;
-                if (nextStage <= MONSTERS_BY_STAGE.length - 2) { // Max stage check
+                if (nextStage <= MONSTERS_BY_STAGE.length - 2) { 
                     showToast(`🏆 ステージ${gameState.stage}をクリア！次のステージへ！`, 'info');
                     updateGameState({
                         stage: nextStage,
@@ -874,14 +1036,13 @@
             } else if (gameState.killsUntilBoss <= 0) {
                 // Regular monsters defeated, and boss threshold reached: Spawn Boss
                 showToast("🚨 強力な魔力の気配...ステージボスが出現した！", 'error');
-                updateGameState({ currentMonsters: [] }); // Clear and re-init will spawn boss
+                updateGameState({ currentMonsters: [] });
             } else {
                 // Regular monsters defeated, reset 3 new ones
                 showToast("敵を全て倒した！新たな敵が現れた。", 'success');
                 updateGameState({ currentMonsters: [] });
             }
             
-            // Re-render to initialize new monsters/stage
             renderCombatTab();
         }
 
@@ -889,7 +1050,6 @@
 
         function renderRecordTab() {
             const content = document.getElementById('tab-record-content');
-            // Log array is sorted in place for rendering purposes (latest first)
             const logs = [...(gameState.studyLogs || [])].sort((a, b) => b.timestamp - a.timestamp);
 
             const recordHtml = `
