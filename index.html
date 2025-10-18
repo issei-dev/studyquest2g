@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>勉強RPG：画像対応・アニメーション版</title>
+    <title>勉強RPG（画像対応・アニメーション版）</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -111,12 +111,6 @@
     <div class="max-w-4xl mx-auto p-4 md:p-8">
         <h1 class="text-3xl font-bold text-center text-secondary mb-6">📚 勉強RPG (画像対応版) ⚔️</h1>
         
-        <!-- Info Banner for Local Storage -->
-        <div class="bg-yellow-800 p-3 rounded-lg shadow-lg mb-6 text-sm text-yellow-100">
-            <p class="font-semibold">⚠️ 注意: このデータはブラウザに保存されています。</p>
-            <p class="mt-1">ブラウザのキャッシュをクリアするとデータが消えるためご注意ください。</p>
-        </div>
-
         <!-- User Info Bar -->
         <div id="user-info-bar" class="bg-rpg-card p-3 rounded-lg shadow-lg mb-6 flex justify-between items-center text-sm md:text-base">
             <p class="font-semibold">ユーザー: <span id="user-id-display" class="text-primary truncate ml-2">きみ</span></p>
@@ -160,24 +154,43 @@
 
         // --- 画像表示のための設定 ---
         // ユーザーが画像をアップロードする際の置き換え場所として、プレースホルダーURLを使用します。
-        // ユーザーはこれらのURLをBase64データURI、または有効な画像URLに置き換えることができます。
         const ITEM_BASE_URL = "https://placehold.co/50x50/374151/f3f4f6?font=inter&text=";
         const MONSTER_BASE_URL = "https://placehold.co/60x60/1f2937/ef4444?font=inter&text=";
 
         const ITEMS = {
+            // 武器と防具に基本HP 'hp: 0' を追加 (強化ボーナスを統一するため)
             weapon: [
-                { id: 'w1', name: '木の剣', rarity: 'N', atk: 5, def: 0, icon: ITEM_BASE_URL + 'WPN1' },
-                { id: 'w2', name: '鉄の剣', rarity: 'R', atk: 15, def: 0, icon: ITEM_BASE_URL + 'WPN2' },
-                { id: 'w3', name: '鋼の剣', rarity: 'SR', atk: 30, def: 0, icon: ITEM_BASE_URL + 'WPN3' },
-                { id: 'w4', name: 'ミスリルソード', rarity: 'UR', atk: 60, def: 5, icon: ITEM_BASE_URL + 'WPN4' },
-                { id: 'w5', name: '聖剣エクスカリバー', rarity: 'L', atk: 120, def: 10, icon: ITEM_BASE_URL + 'WPN5' },
+                // N レアリティ
+                { id: 'w1', name: '木の剣', rarity: 'N', atk: 5, def: 0, hp: 0, icon: ITEM_BASE_URL + 'sq2-w1' },
+                { id: 'w2', name: '木の斧', rarity: 'N', atk: 3, def: 2, hp: 0, icon: ITEM_BASE_URL + 'sq2-w2' },
+                { id: 'w3', name: '木の杖', rarity: 'N', atk: 2, def: 0, hp: 3, icon: ITEM_BASE_URL + 'sq2-w3' },
+                { id: 'w4', name: '木の盾', rarity: 'N', atk: 0, def: 5, hp: 0, icon: ITEM_BASE_URL + 'sq2-w4' },
+                { id: 'w5', name: '石の剣', rarity: 'N', atk: 4, def: 0, hp: 1, icon: ITEM_BASE_URL + 'sq2-w5' },
+                { id: 'w6', name: '石の斧', rarity: 'N', atk: 3, def: 1, hp: 1, icon: ITEM_BASE_URL + 'sq2-w6' },
+                { id: 'w7', name: '石の槍', rarity: 'N', atk: 2, def: 2, hp: 1, icon: ITEM_BASE_URL + 'sq2-w7' },
+                { id: 'w8', name: '石の盾', rarity: 'N', atk: 0, def: 4, hp: 1, icon: ITEM_BASE_URL + 'sq2-w8' },
+                // R レアリティ
+                { id: 'w9', name: '鉄の剣', rarity: 'R', atk: 15, def: 0, hp: 0, icon: ITEM_BASE_URL + 'sq2-w9' },
+                { id: 'w10', name: '鉄の斧', rarity: 'R', atk: 10, def: 5, hp: 0, icon: ITEM_BASE_URL + 'sq2-w10' },
+                { id: 'w11', name: '鉄の槍', rarity: 'R', atk: 10, def: 0, hp: 5, icon: ITEM_BASE_URL + 'sq2-w11' },
+                { id: 'w12', name: '鉄の盾', rarity: 'R', atk: 0, def: 15, hp: 0, icon: ITEM_BASE_URL + 'sq2-w12' },
+                // SR レアリティ
+                { id: 'w13', name: '金の剣', rarity: 'SR', atk: 45, def: 0, hp: 0, icon: ITEM_BASE_URL + 'sq2-w13' },
+                { id: 'w14', name: '金の斧', rarity: 'SR', atk: 30, def: 15, hp: 0, icon: ITEM_BASE_URL + 'sq2-w14' },
+                { id: 'w15', name: '金の槍', rarity: 'SR', atk: 30, def: 0, hp: 15, icon: ITEM_BASE_URL + 'sq2-w15' },
+                { id: 'w16', name: '金の盾', rarity: 'SR', atk: 0, def: 45, hp: 0, icon: ITEM_BASE_URL + 'sq2-w16' },
+                // UR レアリティ
+                { id: 'w17', name: 'ダイヤモンドの剣', rarity: 'UR', atk: 135, def: 0, hp: 0, icon: ITEM_BASE_URL + 'sq2-w17' },
+                { id: 'w18', name: 'ダイヤモンドの斧', rarity: 'UR', atk: 100, def: 35, hp: 0, icon: ITEM_BASE_URL + 'sq2-w18' },
+                { id: 'w19', name: 'ダイヤモンドの槍', rarity: 'UR', atk: 100, def: 0, hp: 35, icon: ITEM_BASE_URL + 'sq2-w19' },
+                { id: 'w20', name: 'ダイヤモンドの盾', rarity: 'UR', atk: 0, def: 135, hp: 0, icon: ITEM_BASE_URL + 'sq2-w20' },
             ],
             armor: [
-                { id: 'a1', name: '布の服', rarity: 'N', atk: 0, def: 3, icon: ITEM_BASE_URL + 'ARM1' },
-                { id: 'a2', name: '革鎧', rarity: 'R', atk: 0, def: 10, icon: ITEM_BASE_URL + 'ARM2' },
-                { id: 'a3', name: '鎖帷子', rarity: 'SR', atk: 5, def: 25, icon: ITEM_BASE_URL + 'ARM3' },
-                { id: 'a4', name: 'プレートアーマー', rarity: 'UR', atk: 10, def: 50, icon: ITEM_BASE_URL + 'ARM4' },
-                { id: 'a5', name: 'ドラゴンメイル', rarity: 'L', atk: 20, def: 100, icon: ITEM_BASE_URL + 'ARM5' },
+                { id: 'a1', name: '布の服', rarity: 'N', atk: 0, def: 3, hp: 0, icon: ITEM_BASE_URL + 'ARM1' },
+                { id: 'a2', name: '革鎧', rarity: 'R', atk: 0, def: 10, hp: 0, icon: ITEM_BASE_URL + 'ARM2' },
+                { id: 'a3', name: '鎖帷子', rarity: 'SR', atk: 5, def: 25, hp: 0, icon: ITEM_BASE_URL + 'ARM3' },
+                { id: 'a4', name: 'プレートアーマー', rarity: 'UR', atk: 10, def: 50, hp: 0, icon: ITEM_BASE_URL + 'ARM4' },
+                { id: 'a5', name: 'ドラゴンメイル', rarity: 'L', atk: 20, def: 100, hp: 0, icon: ITEM_BASE_URL + 'ARM5' },
             ],
             pet: [
                 { id: 'p1', name: 'スライム', rarity: 'N', atk: 2, def: 2, hp: 5, icon: ITEM_BASE_URL + 'PET1' },
@@ -297,9 +310,18 @@
                     const itemData = ITEMS[itemEntry.type].find(i => i.id === itemEntry.id);
                     if (itemData) {
                         const plus = itemEntry.plus || 0;
-                        totalAtk += (itemData.atk || 0) + plus;
-                        totalDef += (itemData.def || 0) + plus;
-                        totalMaxHp += (itemData.hp || 0) + (plus * 2);
+                        
+                        // 装備の基本ステータスを加算
+                        totalAtk += (itemData.atk || 0);
+                        totalDef += (itemData.def || 0);
+                        totalMaxHp += (itemData.hp || 0);
+
+                        // 強化ボーナスを適用
+                        // ATK/DEFは +1/強化レベル
+                        totalAtk += plus;
+                        totalDef += plus;
+                        // HPは +2/強化レベル (武器・防具・ペット共通)
+                        totalMaxHp += (plus * 2);
                     }
                 }
             });
@@ -691,9 +713,10 @@
                         ${gameState.inventory.map(itemEntry => {
                             const itemData = getItemDetails(itemEntry.id, itemEntry.type);
                             const isEquipped = Object.values(gameState.equipment).includes(itemEntry.itemId);
+                            // HPの基本値が0でも、ペット以外は表示しない (見た目をシンプルにするため)
                             const statText = itemEntry.type === 'pet'
                                 ? `HP+${itemData.hp}, ATK+${itemData.atk}, DEF+${itemData.def}`
-                                : `ATK+${itemData.atk}, DEF+${itemData.def}`;
+                                : `HP+${itemData.hp}, ATK+${itemData.atk}, DEF+${itemData.def}`;
                             const typeLabel = itemEntry.type === 'weapon' ? '武器' : (itemEntry.type === 'armor' ? '防具' : 'ペット');
                             const canEnhance = gameState.enhancementItems > 0 && itemEntry.plus < 100;
 
